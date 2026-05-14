@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Bakery Freezer Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDimvHQul8JpAYN4tM6LByTX5hjHVNLLO4",
+    authDomain: "freezer-crashout.firebaseapp.com",
+    databaseURL: "https://freezer-crashout-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "freezer-crashout",
+    storageBucket: "freezer-crashout.firebasestorage.app",
+    messagingSenderId: "981914461837",
+    appId: "1:981914461837:web:549b26688bc984fb59e4c4"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  const storage = getStorage(app);
+
+  window._fbDb      = db;
+  window._fbRef     = ref;
+  window._fbSet     = set;
+  window._fbGet     = get;
+  window._fbOnValue = onValue;
+  window._fbStorage = storage;
+  window._fbSRef    = sRef;
+  window._fbUpload  = uploadBytes;
+  window._fbGetURL  = getDownloadURL;
+  window._fbReady   = true;
+
+  // notify app once Firebase is ready
+  window.dispatchEvent(new Event("firebaseReady"));
+</script>
+
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #181c26;
+  --surface2: #1f2435;
+  --border: #2a3048;
+  --accent: #4fffb0;
+  --accent2: #ff6b6b;
+  --accent3: #ffd166;
+  --text: #e8ecf4;
+  --muted: #6b7594;
+  --green: #4fffb0;
+  --red: #ff4d6d;
+  --yellow: #ffd166;
+  --blue: #4fc3f7;
+  --radius: 10px;
+  --font-head: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+
+.topbar h1 {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+  flex: 1;
+}
+
+.tab-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  outline: none;
+  cursor: pointer;
+}
+
+.sync-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.3s;
+}
+.sync-dot.active { background: var(--green); }
+.sync-dot.error  { background: var(--red); }
+
+/* ── PAGES ── */
+.page { display: none; padding: 16px; max-width: 900px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* ── FILTER BAR ── */
+.filter-bar {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 14px;
+}
+
+.filter-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(79,255,176,0.08);
+}
+
+/* ── PULL LIST TABLE ── */
+.pull-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+}
+
+.pull-table thead th {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 500;
+}
+.pull-table thead th:last-child { text-align: center; }
+
+.pull-row {
+  background: var(--surface);
+  transition: opacity 0.2s;
+}
+.pull-row.hidden-row { display: none; }
+.pull-row.crossed-out {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
+.pull-row td {
+  padding: 10px 10px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.pull-row td:first-child {
+  border-left: 1px solid var(--border);
+  border-radius: var(--radius) 0 0 var(--radius);
+  font-size: 13px;
+}
+.pull-row td:last-child {
+  border-right: 1px solid var(--border);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  text-align: center;
+}
+
+.par-badge {
+  display: inline-block;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.pull-input {
+  width: 64px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  text-align: center;
+  padding: 6px 4px;
+  outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+  inputmode: numeric;
+}
+.pull-input:focus { border-color: var(--accent); }
+.pull-input.has-value {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── STATUS BUTTONS ── */
+.status-btns { display: flex; gap: 6px; justify-content: center; }
+
+.status-btn {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.15s;
+  color: var(--muted);
+}
+.status-btn.tick.active  { background: rgba(79,255,176,0.15); border-color: var(--green); color: var(--green); }
+.status-btn.cross.active { background: rgba(255,77,109,0.15); border-color: var(--red);   color: var(--red); }
+
+/* X remove button */
+.remove-btn {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.remove-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* ── UNDO TOAST ── */
+.undo-toast {
+  position: fixed;
+  bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  display: flex; align-items: center; gap: 12px;
+  z-index: 999;
+  animation: slideUp 0.25s ease;
+}
+.undo-btn {
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 500;
+  border: none; background: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ── BOTTOM BAR ── */
+.bottom-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 10px;
+  z-index: 100;
+}
+
+.bb-stat {
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+.bb-stat:hover, .bb-stat.active-filter {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.bb-spacer { flex: 1; }
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #0f1117;
+  border-color: var(--accent);
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-ghost { background: transparent; color: var(--text); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── EDIT PANEL ── */
+.edit-panel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  overflow-y: auto;
+  padding: 20px 16px 80px;
+}
+.edit-panel.open { display: block; }
+
+.edit-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  max-width: 600px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.edit-header {
+  background: var(--surface2);
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.edit-header h2 {
+  font-family: var(--font-head);
+  font-size: 16px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.edit-list { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+
+.edit-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+  cursor: grab;
+}
+.edit-item:active { cursor: grabbing; }
+.drag-handle { color: var(--muted); font-size: 16px; flex-shrink: 0; }
+.edit-item-name { flex: 1; font-size: 12px; }
+.edit-par-input {
+  width: 52px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  padding: 4px;
+  outline: none;
+}
+.edit-par-input:focus { border-color: var(--accent); }
+
+.edit-days-input {
+  width: 52px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  padding: 4px;
+  outline: none;
+}
+.edit-days-input:focus { border-color: var(--accent); }
+
+.edit-del-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.edit-del-btn:hover { color: var(--red); }
+
+.edit-add-row {
+  display: flex; gap: 8px; padding: 12px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.edit-add-row input, .edit-add-row select {
+  flex: 1; min-width: 120px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+}
+.edit-add-row input:focus { border-color: var(--accent); }
+
+/* ── DATE PAGE ── */
+.date-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; flex-wrap: wrap;
+}
+.date-header h2 {
+  font-family: var(--font-head);
+  font-size: 16px; font-weight: 700; flex: 1;
+}
+
+.date-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+
+.date-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.date-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.date-item.fresh::before     { background: var(--green); }
+.date-item.moderate::before  { background: var(--yellow); }
+.date-item.tight::before     { background: var(--red); }
+
+.date-thumb {
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.date-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.date-thumb-placeholder { font-size: 20px; }
+
+.date-info { flex: 1; min-width: 0; }
+.date-name { font-size: 13px; font-weight: 500; }
+.date-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.date-expiry {
+  font-family: var(--font-head);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+  flex-shrink: 0;
+}
+.date-expiry.fresh    { color: var(--green); }
+.date-expiry.moderate { color: var(--yellow); }
+.date-expiry.tight    { color: var(--red); }
+
+/* image modal */
+.img-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+}
+.img-modal.open { display: flex; }
+.img-modal img {
+  max-width: 90vw;
+  max-height: 80vh;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+/* ── POPUP / MODAL ── */
+.popup-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 250;
+  align-items: center; justify-content: center;
+}
+.popup-overlay.open { display: flex; }
+.popup-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 320px;
+  width: 90%;
+  text-align: center;
+}
+.popup-box p { font-size: 14px; line-height: 1.6; margin-bottom: 18px; }
+.popup-box .popup-icon { font-size: 32px; margin-bottom: 12px; }
+
+/* ── LEGEND ── */
+.legend {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font-size: 11px; color: var(--muted);
+  margin-top: 8px;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot  { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ── SPECIAL NOTES TAG ── */
+.note-tag {
+  display: inline-block;
+  background: rgba(255,209,102,0.1);
+  border: 1px solid rgba(255,209,102,0.3);
+  color: var(--yellow);
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-left: 4px;
+}
+
+/* ── SPACER FOR FIXED BOTTOM ── */
+.page-spacer { height: 70px; }
+
+/* ── DRAG OVER ── */
+.edit-item.drag-over { border-color: var(--accent); background: rgba(79,255,176,0.05); }
+.edit-item.dragging  { opacity: 0.4; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <h1>❄️ Freezer Manager</h1>
+  <select class="tab-select" id="tabSelect" onchange="switchPage(this.value)">
+    <option value="pull">Pull List</option>
+    <option value="date">Date List</option>
+  </select>
+  <div class="sync-dot" id="syncDot" title="Firebase sync"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE 1 — PULL LIST
+═══════════════════════════════════════════════════════════ -->
+<div class="page active" id="page-pull">
+
+  <div class="filter-bar">
+    <button class="filter-btn active" id="filterAll"       onclick="setFilter('all')">All</button>
+    <button class="filter-btn"        id="filterEntered"   onclick="setFilter('entered')">Items Entered</button>
+    <button class="filter-btn"        id="filterInStock"   onclick="setFilter('instock')">✓ In Stock</button>
+    <button class="filter-btn"        id="filterNoStock"   onclick="setFilter('nostock')">✗ Not In Stock</button>
+    <button class="filter-btn"        id="filterHidden"    onclick="setFilter('removed')">Removed</button>
+  </div>
+
+  <table class="pull-table" id="pullTable">
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Par</th>
+        <th>Pull Qty</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="pullBody"></tbody>
+  </table>
+
+  <div class="page-spacer"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE 2 — DATE LIST
+═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-date">
+
+  <div class="date-header">
+    <h2>Date Labels</h2>
+    <button class="btn btn-primary" onclick="generateDates()">⚡ Generate</button>
+    <button class="btn btn-ghost"   onclick="openDateEdit()">✎ Edit</button>
+    <button class="btn btn-ghost"   onclick="downloadDateList()">⬇ Download</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> 15+ days</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div> 7–14 days</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> &lt;7 days</div>
+  </div>
+
+  <div class="date-list" id="dateList">
+    <p style="color:var(--muted);font-size:13px;margin-top:16px">
+      Pull items on Page 1, then tap ⚡ Generate to see expiry dates.
+    </p>
+  </div>
+
+  <div class="page-spacer"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BOTTOM BAR (Pull page)
+═══════════════════════════════════════════════════════════ -->
+<div class="bottom-bar" id="pullBottomBar">
+  <span class="bb-stat" id="statEntered" onclick="setFilter('entered')">0 entered</span>
+  <span class="bb-stat" id="statStock"   onclick="setFilter('instock')">0 ✓</span>
+  <span class="bb-stat" id="statNo"      onclick="setFilter('nostock')">0 ✗</span>
+  <div class="bb-spacer"></div>
+  <button class="btn btn-ghost"   onclick="downloadPullList()">⬇</button>
+  <button class="btn btn-primary" onclick="openEditPanel()">✎ Edit</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     EDIT PANEL — Pull list
+═══════════════════════════════════════════════════════════ -->
+<div class="edit-panel" id="editPanel">
+  <div class="edit-card">
+    <div class="edit-header">
+      <h2>Edit Pull List</h2>
+      <button class="btn btn-ghost" style="padding:6px 12px" onclick="closeEditPanel()">Done</button>
+    </div>
+    <div class="edit-list" id="editList"></div>
+    <div class="edit-add-row">
+      <input type="text"   id="newItemName"  placeholder="Product name">
+      <input type="text"   id="newItemPar"   placeholder="Par" style="max-width:70px" inputmode="numeric">
+      <input type="text"   id="newItemDays"  placeholder="Days" style="max-width:70px" inputmode="numeric">
+      <input type="text"   id="newItemNotes" placeholder="Notes (opt)">
+      <button class="btn btn-primary" onclick="addNewItem()">+ Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DATE EDIT PANEL
+═══════════════════════════════════════════════════════════ -->
+<div class="edit-panel" id="dateEditPanel">
+  <div class="edit-card">
+    <div class="edit-header">
+      <h2>Edit Date List</h2>
+      <button class="btn btn-ghost" style="padding:6px 12px" onclick="closeDateEdit()">Done</button>
+    </div>
+    <div class="edit-list" id="dateEditList"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     UNDO TOAST
+═══════════════════════════════════════════════════════════ -->
+<div class="undo-toast" id="undoToast" style="display:none">
+  <span id="undoMsg">Item removed</span>
+  <button class="undo-btn" onclick="undoRemove()">UNDO</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     IMAGE MODAL
+═══════════════════════════════════════════════════════════ -->
+<div class="img-modal" id="imgModal" onclick="this.classList.remove('open')">
+  <img id="imgModalSrc" src="" alt="Product image">
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     POPUP (double-check warning)
+═══════════════════════════════════════════════════════════ -->
+<div class="popup-overlay" id="doubleCheckPopup">
+  <div class="popup-box">
+    <div class="popup-icon">⚠️</div>
+    <p>Make sure to <strong>double check at least one date</strong> before dating products!</p>
+    <button class="btn btn-primary" style="width:100%" onclick="document.getElementById('doubleCheckPopup').classList.remove('open')">Got it</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCRIPT
+═══════════════════════════════════════════════════════════ -->
+<script>
+// ═══════════════════════════════════════════════════════════
+// DEFAULT DATA
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_ITEMS = [
+  { name:"Whittings Fruit And Nut Loaf 460gm",          par:2,  days:21, notes:"" },
+  { name:"Whittings Date And Apricot 460gm",             par:2,  days:21, notes:"" },
+  { name:"Whittings Light Fruit Cake 480gm",             par:2,  days:60, notes:"" },
+  { name:"Papa Joe's Banana Bread Single 100gm",         par:1,  days:14, notes:"" },
+  { name:"Papa Joe's Banana Bread 500gm",                par:2,  days:14, notes:"" },
+  { name:"Happy Cake Loaf Carrot",                       par:1,  days:10, notes:"" },
+  { name:"Noshu Iced Carrot Cake 180gm",                 par:2,  days:15, notes:"" },
+  { name:"Noshu Fudgy Peanut Brownies 190gm",            par:2,  days:20, notes:"" },
+  { name:"Baker's Oven Lemon Iced Madeira Cake 315gm",   par:2,  days:21, notes:"" },
+  { name:"Baker's Oven Madeira Cake 500gm",              par:2,  days:21, notes:"" },
+  { name:"Greens Lamington Triple Chocolate 4pk",        par:1,  days:16, notes:"" },
+  { name:"Greens Lamington Strawberry And Cream 4pk",    par:1,  days:16, notes:"" },
+  { name:"Baker's Oven Lamington Fingers 350gm",         par:4,  days:21, notes:"" },
+  { name:"Baker's Oven Lamington Jam 350gm",             par:4,  days:21, notes:"" },
+  { name:"Baker's Oven Lamington Cream 350gm",           par:4,  days:28, notes:"" },
+  { name:"Baker's Oven Rollette Choc 250gm",             par:2,  days:21, notes:"" },
+  { name:"Baker's Oven Sponge Roll Choc 400gm",          par:2,  days:21, notes:"" },
+  { name:"Cadbury Rolls Mini Rasp 5pk",                  par:2,  days:63, notes:"" },
+  { name:"Cadbury Rolls Mini Choc 5pk",                  par:2,  days:49, notes:"" },
+  { name:"Comm Co Double Choc Muffin Gluten Free 160gm", par:2,  days:10, notes:"" },
+  { name:"Baker's Oven Rollette Jam 250gm",              par:2,  days:21, notes:"" },
+  { name:"Baker's Oven Roll Jam 400gm",                  par:2,  days:21, notes:"" },
+  { name:"Mr Kipling Angel Slice 6pk",                   par:2,  days:24, notes:"" },
+  { name:"Mr Kipling Lemon Slice 6pk",                   par:2,  days:24, notes:"" },
+  { name:"Comm Co Brownies Gluten Free 180gm",           par:2,  days:14, notes:"" },
+  { name:"Comm Co Caramel Slice Gluten Free 180gm",      par:2,  days:14, notes:"" },
+  { name:"Happy Muffin Co Choc Chip 4pk",                par:1,  days:7,  notes:"" },
+  { name:"Happy Muffin Co Blueberry 4pk",                par:1,  days:7,  notes:"" },
+  { name:"Happy Muffin Co Double Choc Chip Mini 8pk",    par:2,  days:7,  notes:"" },
+  { name:"Happy Muffin Co Choc Chip Mini 8pk",           par:2,  days:7,  notes:"" },
+  { name:"Happy Muffin Co Blueberry 8pk",                par:1,  days:7,  notes:"" },
+  { name:"Country Chef Pavlova 500gm",                   par:1,  days:35, notes:"" },
+  { name:"Comm Co Mud Cake Choc",                        par:1,  days:14, notes:"" },
+  { name:"Country Chef Cupcake Red Velvet 4pk 240gm",    par:1,  days:9,  notes:"" },
+  { name:"Country Chef Cupcake Choc 4pk 288gm",          par:1,  days:9,  notes:"" },
+  { name:"Comm Co Fruit Slice Loaf Gluten Free 585gm",   par:1,  days:10, notes:"" },
+  { name:"Marcel's Pancake Happy 6pk 240gm",             par:2,  days:5,  notes:"" },
+  { name:"Marcel's Pancake Happy Petit 24pk 200gm",      par:1,  days:5,  notes:"" },
+  { name:"Marcel's Buttermilk Pikelets 200gm",           par:2,  days:5,  notes:"" },
+  { name:"This Sourdough Co Crumpets 260gm",             par:1,  days:3,  notes:"" },
+  { name:"New York Bagel 4pk",                           par:2,  days:8,  notes:"" },
+  { name:"Glick's Bagel Everything 4pk 360gm",           par:2,  days:8,  notes:"" },
+  { name:"Glick's Bagel Plain 4pk 360gm",                par:2,  days:8,  notes:"" },
+  { name:"Glick's Bagel Sesame 4pk 360gm",               par:2,  days:8,  notes:"" },
+  { name:"Comm Co English Muffin G/F 390gm",             par:1,  days:10, notes:"" },
+  { name:"This Sourdough Co English Muffins 260gm",      par:1,  days:3,  notes:"" },
+  { name:"Toscano Croissants 240gm",                     par:6,  days:21, notes:"" },
+  { name:"Baker's Oven Croissants 3pk",                  par:2,  days:5,  notes:"" },
+  { name:"Mill Lane English Style Waffles 6pk 130gm",    par:2,  days:41, notes:"" },
+  { name:"Wattle Valley Waffle 280gm",                   par:6,  days:28, notes:"" },
+  { name:"Toscano Waffles 360gm",                        par:6,  days:35, notes:"" },
+  { name:"Toscano Brioche Buns 270gm",                   par:0,  days:21, notes:"Whole Box" },
+  { name:"Toscano Hot Dog Buns 270gm",                   par:6,  days:21, notes:"" },
+  { name:"Toscano Brioche Classic 280gm",                par:4,  days:21, notes:"" },
+  { name:"Bakers Oven Dinner Rolls 6pk",                 par:1,  days:3,  notes:"Blue" },
+  { name:"Bakery Dujour Brioche Buns 4pk",               par:2,  days:5,  notes:"" },
+  { name:"Comm Co Sourdough Baguette",                   par:2,  days:3,  notes:"Bags above weigh labeller" },
+  { name:"Comm Co Sourdough Rolls 4pk",                  par:1,  days:3,  notes:"Thaw in the bag" },
+  { name:"Mr Pitta Milk Buns",                           par:3,  days:7,  notes:"" },
+  { name:"Mill Lane Sourdough White Vienna 680gm",       par:2,  days:4,  notes:"" },
+  { name:"Mill Lane Sourdough Multigrain Vienna 680gm",  par:2,  days:4,  notes:"" },
+  { name:"Mill Lane Turkish 3pk",                        par:6,  days:5,  notes:"" },
+  { name:"Mill Lane Ciabatta 3pk",                       par:2,  days:5,  notes:"" },
+  { name:"Kontos Flatbread Multigrain 5pk 397gm",        par:2,  days:10, notes:"" },
+  { name:"Kontos Pita White 5pk 397gm",                  par:2,  days:10, notes:"" },
+  { name:"Mission Souvlaki 320gm",                       par:4,  days:14, notes:"" },
+  { name:"Kontos Grilled Panini 255gm",                  par:2,  days:28, notes:"" },
+  { name:"Mr Pitta Pita Bread",                          par:3,  days:7,  notes:"" },
+  { name:"Comm Co Loaf Seeded 585gm",                    par:4,  days:10, notes:"" },
+  { name:"Well And Good White Sliced 300gm",             par:2,  days:18, notes:"" },
+  { name:"Well And Good Brioche Buns 225gm",             par:2,  days:18, notes:"" },
+  { name:"Comm Co Chicken Schnitzel 400gm",              par:3,  days:15, notes:"THAW IN FRIDGE" },
+  { name:"Comm Co Butter Chicken 350gm",                 par:2,  days:16, notes:"THAW IN FRIDGE" },
+  { name:"Comm Co Chicken Tikka Masala 350gm",           par:2,  days:16, notes:"THAW IN FRIDGE" },
+  { name:"Comm Co Satay Chicken 350gm",                  par:2,  days:16, notes:"THAW IN FRIDGE" },
+  { name:"Comm Co Thai Green Curry",                     par:2,  days:16, notes:"THAW IN FRIDGE" },
+  { name:"Gerry's Pittes 450gm",                         par:0,  days:21, notes:"Whole Box" },
+  { name:"Solo Tiramisu 200gm",                          par:4,  days:40, notes:"THAW IN FRIDGE" },
+  { name:"Comm Co Fruit HCB",                            par:1,  days:3,  notes:"" },
+  { name:"Comm Co Fruitless HCB",                        par:1,  days:3,  notes:"" },
+  { name:"Comm Co Choc Chip HCB",                        par:1,  days:3,  notes:"" },
+  { name:"Yarrows Fruit HCB",                            par:1,  days:5,  notes:"" },
+  { name:"Yarrows Fruitless HCB",                        par:1,  days:5,  notes:"" },
+];
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let items       = [];   // master list with all metadata
+let rowState    = {};   // { [id]: { qty, status, removed } }
+let images      = {};   // { [id]: url }
+let lastRemoved = null;
+let undoTimer   = null;
+let currentFilter = 'all';
+let dragSrc     = null;
+let generatedDates = {}; // { [id]: { date, days } }
+
+// ═══════════════════════════════════════════════════════════
+// FIREBASE HELPERS
+// ═══════════════════════════════════════════════════════════
+function waitForFirebase(cb) {
+  if (window._fbReady) { cb(); }
+  else { window.addEventListener('firebaseReady', cb, { once: true }); }
+}
+
+function fbSave() {
+  waitForFirebase(() => {
+    const db = window._fbDb;
+    const ref = window._fbRef(db, 'freezer/');
+    window._fbSet(ref, { items, rowState, images, generatedDates })
+      .then(() => setSyncDot('active'))
+      .catch(() => setSyncDot('error'));
+  });
+}
+
+function fbLoad(cb) {
+  waitForFirebase(() => {
+    const db = window._fbDb;
+    const r = window._fbRef(db, 'freezer/');
+    window._fbOnValue(r, snap => {
+      const data = snap.val();
+      if (data) {
+        if (data.items)          items          = data.items;
+        if (data.rowState)       rowState       = data.rowState;
+        if (data.images)         images         = data.images;
+        if (data.generatedDates) generatedDates = data.generatedDates;
+      } else {
+        items = DEFAULT_ITEMS.map((it, i) => ({ ...it, id: i }));
+      }
+      setSyncDot('active');
+      renderPullList();
+      if (cb) cb();
+    }, () => setSyncDot('error'));
+  });
+}
+
+function setSyncDot(state) {
+  const d = document.getElementById('syncDot');
+  d.className = 'sync-dot ' + state;
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // try Firebase; fall back to localStorage
+  try {
+    fbLoad();
+  } catch(e) {
+    loadLocal();
+    renderPullList();
+  }
+});
+
+function loadLocal() {
+  const saved = localStorage.getItem('freezerData');
+  if (saved) {
+    const d = JSON.parse(saved);
+    items          = d.items          || DEFAULT_ITEMS.map((it,i)=>({...it,id:i}));
+    rowState       = d.rowState       || {};
+    images         = d.images         || {};
+    generatedDates = d.generatedDates || {};
+  } else {
+    items = DEFAULT_ITEMS.map((it,i)=>({...it,id:i}));
+  }
+}
+
+function saveLocal() {
+  localStorage.setItem('freezerData', JSON.stringify({ items, rowState, images, generatedDates }));
+}
+
+function save() {
+  saveLocal();
+  try { fbSave(); } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// PULL LIST RENDER
+// ═══════════════════════════════════════════════════════════
+function renderPullList() {
+  const tbody = document.getElementById('pullBody');
+  tbody.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const id  = item.id ?? idx;
+    const rs  = rowState[id] || {};
+    const qty = rs.qty    || '';
+    const st  = rs.status || '';  // 'tick' | 'cross' | ''
+    const rem = rs.removed || false;
+
+    const tr = document.createElement('tr');
+    tr.className = 'pull-row';
+    tr.dataset.id = id;
+
+    // apply filter visibility
+    applyRowFilter(tr, qty, st, rem);
+
+    tr.innerHTML = `
+      <td>
+        <span style="font-size:13px">${item.name}</span>
+        ${item.notes ? `<span class="note-tag">${item.notes}</span>` : ''}
+      </td>
+      <td><span class="par-badge">${item.par || '—'}</span></td>
+      <td>
+        <input
+          class="pull-input ${qty ? 'has-value' : ''}"
+          type="number"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          value="${qty}"
+          min="0"
+          data-id="${id}"
+          data-idx="${idx}"
+          onchange="setQty(this)"
+          onkeydown="handleEnter(event, ${idx})"
+        >
+      </td>
+      <td>
+        <div class="status-btns">
+          <button class="status-btn tick ${st==='tick'?'active':''}"
+            onclick="setStatus(${id},'tick',this)">✓</button>
+          <button class="status-btn cross ${st==='cross'?'active':''}"
+            onclick="setStatus(${id},'cross',this)">✗</button>
+        </div>
+      </td>
+      <td>
+        <button class="remove-btn" onclick="removeRow(${id},this)" title="Hide row">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  updateStats();
+}
+
+function applyRowFilter(tr, qty, st, rem) {
+  // hidden because removed
+  if (rem) {
+    if (currentFilter === 'removed') {
+      tr.classList.remove('hidden-row');
+      tr.classList.add('crossed-out');
+    } else {
+      tr.classList.add('hidden-row');
+    }
+    return;
+  }
+  tr.classList.remove('crossed-out');
+
+  switch (currentFilter) {
+    case 'all':     tr.classList.remove('hidden-row'); break;
+    case 'entered': qty ? tr.classList.remove('hidden-row') : tr.classList.add('hidden-row'); break;
+    case 'instock': st==='tick'  ? tr.classList.remove('hidden-row') : tr.classList.add('hidden-row'); break;
+    case 'nostock': st==='cross' ? tr.classList.remove('hidden-row') : tr.classList.add('hidden-row'); break;
+    case 'removed': tr.classList.add('hidden-row'); break;
+  }
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  ['All','Entered','InStock','NoStock','Hidden'].forEach(n => {
+    document.getElementById('filter'+n)?.classList.remove('active');
+  });
+  const map = { all:'All', entered:'Entered', instock:'InStock', nostock:'NoStock', removed:'Hidden' };
+  document.getElementById('filter'+map[f])?.classList.add('active');
+
+  // re-apply filter to existing rows
+  items.forEach((item, idx) => {
+    const id  = item.id ?? idx;
+    const rs  = rowState[id] || {};
+    const tr  = document.querySelector(`tr[data-id="${id}"]`);
+    if (!tr) return;
+    applyRowFilter(tr, rs.qty||'', rs.status||'', rs.removed||false);
+  });
+  updateStats();
+}
+
+function setQty(input) {
+  const id = parseInt(input.dataset.id);
+  const v  = input.value.trim();
+  if (!rowState[id]) rowState[id] = {};
+  rowState[id].qty = v;
+  input.classList.toggle('has-value', !!v);
+  updateStats();
+  save();
+}
+
+function setStatus(id, which, btn) {
+  if (!rowState[id]) rowState[id] = {};
+  const current = rowState[id].status;
+  const newSt   = current === which ? '' : which;
+  rowState[id].status = newSt;
+
+  // update buttons in row
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  if (row) {
+    row.querySelector('.tick').classList.toggle('active', newSt==='tick');
+    row.querySelector('.cross').classList.toggle('active', newSt==='cross');
+  }
+  updateStats();
+  save();
+}
+
+function removeRow(id, btn) {
+  if (!rowState[id]) rowState[id] = {};
+  rowState[id].removed = true;
+  lastRemoved = id;
+
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  if (row) {
+    if (currentFilter === 'all') {
+      // keep visible but crossed out only in 'removed' view
+      row.classList.add('hidden-row');
+    } else {
+      row.classList.add('hidden-row');
+    }
+  }
+  updateStats();
+  save();
+  showUndoToast(items.find(it=>(it.id??it.name)===id)?.name || 'Item');
+}
+
+function undoRemove() {
+  if (lastRemoved === null) return;
+  if (rowState[lastRemoved]) rowState[lastRemoved].removed = false;
+  clearTimeout(undoTimer);
+  document.getElementById('undoToast').style.display = 'none';
+  save();
+  setFilter(currentFilter); // re-render filter
+  updateStats();
+  lastRemoved = null;
+}
+
+function showUndoToast(name) {
+  const toast = document.getElementById('undoToast');
+  document.getElementById('undoMsg').textContent = `"${name.substring(0,30)}" removed`;
+  toast.style.display = 'flex';
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    toast.style.display = 'none';
+    lastRemoved = null;
+  }, 5000);
+}
+
+function handleEnter(e, idx) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const inputs = document.querySelectorAll('.pull-input');
+    const visible = Array.from(inputs).filter(inp => {
+      return !inp.closest('tr').classList.contains('hidden-row');
+    });
+    const ci = visible.indexOf(e.target);
+    if (ci < visible.length - 1) visible[ci+1].focus();
+  }
+}
+
+function updateStats() {
+  let entered = 0, inStock = 0, noStock = 0;
+  items.forEach((item, idx) => {
+    const id = item.id ?? idx;
+    const rs = rowState[id] || {};
+    if (rs.removed) return;
+    if (rs.qty)           entered++;
+    if (rs.status==='tick')  inStock++;
+    if (rs.status==='cross') noStock++;
+  });
+  document.getElementById('statEntered').textContent = `${entered} entered`;
+  document.getElementById('statStock').textContent   = `${inStock} ✓`;
+  document.getElementById('statNo').textContent      = `${noStock} ✗`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PAGE SWITCH
+// ═══════════════════════════════════════════════════════════
+function switchPage(val) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + val).classList.add('active');
+  document.getElementById('pullBottomBar').style.display = val==='pull' ? 'flex' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+// DATE PAGE — GENERATE
+// ═══════════════════════════════════════════════════════════
+function generateDates() {
+  document.getElementById('doubleCheckPopup').classList.add('open');
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  generatedDates = {};
+  const pulled = [];
+
+  items.forEach((item, idx) => {
+    const id = item.id ?? idx;
+    const rs = rowState[id] || {};
+    if (rs.removed) return;
+    if (rs.status === 'cross') return; // not in stock
+    if (!rs.qty || parseInt(rs.qty) === 0) return;
+
+    // expiry = today + days (inclusive: shelf life INCLUDES today so +days gives last day)
+    const expiry = new Date(today);
+    expiry.setDate(expiry.getDate() + item.days);
+
+    generatedDates[id] = {
+      name: item.name,
+      days: item.days,
+      qty:  rs.qty,
+      notes: item.notes || '',
+      expiry: expiry.toISOString().split('T')[0]
+    };
+    pulled.push(id);
+  });
+
+  save();
+  renderDateList();
+}
+
+function renderDateList() {
+  const container = document.getElementById('dateList');
+  const ids = Object.keys(generatedDates);
+  if (!ids.length) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:13px;margin-top:16px">No pulled items found. Add quantities on Page 1 first.</p>';
+    return;
+  }
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  container.innerHTML = '';
+  ids.sort((a,b) => generatedDates[a].expiry.localeCompare(generatedDates[b].expiry));
+
+  ids.forEach(id => {
+    const g    = generatedDates[id];
+    const exp  = new Date(g.expiry + 'T00:00:00');
+    const diff = Math.round((exp - today) / 86400000);
+    const cls  = diff >= 15 ? 'fresh' : diff >= 7 ? 'moderate' : 'tight';
+    const fmt  = exp.toLocaleDateString('en-AU', { day:'2-digit', month:'2-digit', year:'2-digit' });
+    const imgUrl = images[id] || '';
+
+    const div = document.createElement('div');
+    div.className = `date-item ${cls}`;
+    div.innerHTML = `
+      <div class="date-thumb" onclick="showImg('${imgUrl}','${g.name}')">
+        ${imgUrl ? `<img src="${imgUrl}" alt="${g.name}">` : `<span class="date-thumb-placeholder">📦</span>`}
+      </div>
+      <div class="date-info">
+        <div class="date-name">${g.name}</div>
+        <div class="date-sub">Qty: ${g.qty} · ${g.days} days shelf life${g.notes ? ' · '+g.notes : ''}</div>
+      </div>
+      <div class="date-expiry ${cls}">${fmt}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function showImg(url, name) {
+  if (!url) return;
+  document.getElementById('imgModalSrc').src = url;
+  document.getElementById('imgModal').classList.add('open');
+}
+
+// ═══════════════════════════════════════════════════════════
+// EDIT PANEL — Pull list
+// ═══════════════════════════════════════════════════════════
+function openEditPanel() {
+  const list = document.getElementById('editList');
+  list.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const id = item.id ?? idx;
+    const div = document.createElement('div');
+    div.className = 'edit-item';
+    div.draggable = true;
+    div.dataset.idx = idx;
+
+    div.innerHTML = `
+      <span class="drag-handle">⠿</span>
+      <span class="edit-item-name">${item.name}</span>
+      <label style="font-size:10px;color:var(--muted)">Par</label>
+      <input class="edit-par-input" type="number" inputmode="numeric" value="${item.par}" onchange="updatePar(${idx},this.value)">
+      <label style="font-size:10px;color:var(--muted)">Days</label>
+      <input class="edit-days-input" type="number" inputmode="numeric" value="${item.days}" onchange="updateDays(${idx},this.value)">
+      <button class="edit-del-btn" onclick="deleteItem(${idx})">🗑</button>
+    `;
+
+    // drag events
+    div.addEventListener('dragstart', e => {
+      dragSrc = div;
+      div.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    div.addEventListener('dragend', () => {
+      div.classList.remove('dragging');
+      document.querySelectorAll('.edit-item').forEach(d => d.classList.remove('drag-over'));
+    });
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      document.querySelectorAll('.edit-item').forEach(d => d.classList.remove('drag-over'));
+      div.classList.add('drag-over');
+    });
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === div) return;
+      const fromIdx = parseInt(dragSrc.dataset.idx);
+      const toIdx   = parseInt(div.dataset.idx);
+      const moved   = items.splice(fromIdx, 1)[0];
+      items.splice(toIdx, 0, moved);
+      save();
+      openEditPanel();
+    });
+
+    list.appendChild(div);
+  });
+
+  document.getElementById('editPanel').classList.add('open');
+}
+
+function closeEditPanel() {
+  document.getElementById('editPanel').classList.remove('open');
+  renderPullList();
+}
+
+function updatePar(idx, val) {
+  items[idx].par = parseInt(val) || 0;
+  save();
+}
+
+function updateDays(idx, val) {
+  items[idx].days = parseInt(val) || 1;
+  save();
+}
+
+function deleteItem(idx) {
+  if (!confirm(`Remove "${items[idx].name}" from list?`)) return;
+  items.splice(idx, 1);
+  save();
+  openEditPanel();
+}
+
+function addNewItem() {
+  const name  = document.getElementById('newItemName').value.trim();
+  const par   = parseInt(document.getElementById('newItemPar').value)  || 0;
+  const days  = parseInt(document.getElementById('newItemDays').value) || 7;
+  const notes = document.getElementById('newItemNotes').value.trim();
+  if (!name) { alert('Please enter a product name.'); return; }
+
+  const newId = Date.now();
+  items.push({ id: newId, name, par, days, notes });
+  document.getElementById('newItemName').value  = '';
+  document.getElementById('newItemPar').value   = '';
+  document.getElementById('newItemDays').value  = '';
+  document.getElementById('newItemNotes').value = '';
+  save();
+  openEditPanel();
+}
+
+// ═══════════════════════════════════════════════════════════
+// DATE EDIT PANEL
+// ═══════════════════════════════════════════════════════════
+function openDateEdit() {
+  const list = document.getElementById('dateEditList');
+  list.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const id = item.id ?? idx;
+    const div = document.createElement('div');
+    div.className = 'edit-item';
+    div.style.flexWrap = 'wrap';
+
+    const imgUrl = images[id] || '';
+
+    div.innerHTML = `
+      <span class="edit-item-name" style="width:100%;font-size:12px;margin-bottom:4px">${item.name}</span>
+      <label style="font-size:10px;color:var(--muted)">Days</label>
+      <input class="edit-days-input" type="number" inputmode="numeric" value="${item.days}" onchange="updateDays(${idx},this.value)">
+      <label style="font-size:10px;color:var(--muted)">Photo</label>
+      <input type="file" accept="image/*" style="font-size:11px;color:var(--muted);background:none;border:none" onchange="uploadImage(${id},this)">
+      ${imgUrl ? `<img src="${imgUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">` : ''}
+    `;
+    list.appendChild(div);
+  });
+
+  document.getElementById('dateEditPanel').classList.add('open');
+}
+
+function closeDateEdit() {
+  document.getElementById('dateEditPanel').classList.remove('open');
+}
+
+function uploadImage(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Try Firebase Storage first
+  try {
+    const storage = window._fbStorage;
+    const storageRef = window._fbSRef(storage, `images/${id}`);
+    window._fbUpload(storageRef, file).then(snap => {
+      return window._fbGetURL(snap.ref);
+    }).then(url => {
+      images[id] = url;
+      save();
+      openDateEdit();
+    });
+    return;
+  } catch(e) {}
+
+  // Fallback: base64 in localStorage
+  const reader = new FileReader();
+  reader.onload = e => {
+    images[id] = e.target.result;
+    save();
+    openDateEdit();
+  };
+  reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════════════════════════
+// DOWNLOAD — Pull List
+// ═══════════════════════════════════════════════════════════
+function downloadPullList() {
+  const today = new Date().toLocaleDateString('en-AU');
+  let csv = `Bakery Freezer Pull List — ${today}\n\n`;
+  csv += `Product,Par Level,Pull Qty,Status,Notes\n`;
+
+  items.forEach((item, idx) => {
+    const id = item.id ?? idx;
+    const rs = rowState[id] || {};
+    if (rs.removed) return;
+    const status = rs.status === 'tick' ? 'In Stock' : rs.status === 'cross' ? 'Not In Stock' : '';
+    csv += `"${item.name}",${item.par},${rs.qty||''},${status},"${item.notes||''}"\n`;
+  });
+
+  downloadFile(csv, `pull-list-${today}.csv`, 'text/csv');
+}
+
+// ═══════════════════════════════════════════════════════════
+// DOWNLOAD — Date List
+// ═══════════════════════════════════════════════════════════
+function downloadDateList() {
+  const today = new Date().toLocaleDateString('en-AU');
+  const ids   = Object.keys(generatedDates);
+  if (!ids.length) { alert('Generate dates first!'); return; }
+
+  let csv = `Bakery Date Label List — ${today}\n\n`;
+  csv += `Product,Qty,Shelf Life (days),Expiry Date,Notes\n`;
+
+  ids.sort((a,b) => generatedDates[a].expiry.localeCompare(generatedDates[b].expiry));
+  ids.forEach(id => {
+    const g   = generatedDates[id];
+    const exp = new Date(g.expiry + 'T00:00:00');
+    const fmt = exp.toLocaleDateString('en-AU');
+    csv += `"${g.name}",${g.qty},${g.days},"${fmt}","${g.notes}"\n`;
+  });
+
+  downloadFile(csv, `date-list-${today}.csv`, 'text/csv');
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+</script>
+</body>
+</html>
