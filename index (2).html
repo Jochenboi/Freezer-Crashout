@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bakery Freezer Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDimvHQul8JpAYN4tM6LByTX5hjHVNLLO4",
+    authDomain: "freezer-crashout.firebaseapp.com",
+    databaseURL: "https://freezer-crashout-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "freezer-crashout",
+    storageBucket: "freezer-crashout.firebasestorage.app",
+    messagingSenderId: "981914461837",
+    appId: "1:981914461837:web:549b26688bc984fb59e4c4"
+  };
+
+  const app     = initializeApp(firebaseConfig);
+  const db      = getDatabase(app);
+  const storage = getStorage(app);
+
+  window._fbDb      = db;
+  window._fbRef     = ref;
+  window._fbSet     = set;
+  window._fbOnValue = onValue;
+  window._fbStorage = storage;
+  window._fbSRef    = sRef;
+  window._fbUpload  = uploadBytes;
+  window._fbGetURL  = getDownloadURL;
+  window._fbReady   = true;
+  window.dispatchEvent(new Event("firebaseReady"));
+</script>
+
+<style>
+:root {
+  --bg:        #F4F6F9;
+  --white:     #FFFFFF;
+  --border:    #E2E6ED;
+  --border2:   #C8D0DC;
+  --text:      #1A1D23;
+  --text2:     #4A5068;
+  --muted:     #8891A8;
+  --accent:    #1D4ED8;
+  --accent-lt: #EEF2FF;
+  --green:     #059669;
+  --green-lt:  #ECFDF5;
+  --red:       #DC2626;
+  --red-lt:    #FEF2F2;
+  --amber:     #D97706;
+  --amber-lt:  #FFFBEB;
+  --blue-lt:   #EFF6FF;
+  --r:         10px;
+  --r-lg:      16px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.04);
+  --shadow:    0 4px 14px rgba(0,0,0,0.08),0 1px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.14),0 4px 12px rgba(0,0,0,0.06);
+  --font: 'Inter',-apple-system,sans-serif;
+  --font-d: 'Playfair Display',serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ── TOPBAR ── */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:var(--white);border-bottom:1px solid var(--border);
+  box-shadow:var(--shadow-sm);
+  padding:0 18px;height:62px;
+  display:flex;align-items:center;gap:12px;
+}
+.tl{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.tl-icon{
+  width:38px;height:38px;flex-shrink:0;
+  background:linear-gradient(135deg,#1D4ED8,#3B82F6);
+  border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:19px;box-shadow:0 2px 10px rgba(29,78,216,.3);
+}
+.tl-text h1{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+.tl-text p{font-size:10px;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-top:1px}
+.tab-pills{display:flex;background:#F0F2F5;border-radius:var(--r);padding:3px;gap:2px;flex-shrink:0}
+.tab-pill{
+  font-family:var(--font);font-size:12px;font-weight:600;
+  padding:6px 14px;border-radius:8px;border:none;
+  background:transparent;color:var(--muted);cursor:pointer;transition:all .18s;white-space:nowrap;
+}
+.tab-pill.active{background:var(--white);color:var(--accent);box-shadow:var(--shadow-sm)}
+.sync-pill{
+  display:flex;align-items:center;gap:5px;flex-shrink:0;
+  background:#F0F2F5;border-radius:999px;padding:5px 10px;
+  font-size:11px;font-weight:500;color:var(--muted);white-space:nowrap;
+}
+.sd{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background .4s}
+.sd.live{background:var(--green)} .sd.err{background:var(--red)}
+
+/* ── PAGES ── */
+.page{display:none;padding:18px;max-width:960px;margin:0 auto}
+.page.active{display:block}
+
+/* ── FILTER CHIPS ── */
+.filter-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{
+  font-size:12px;font-weight:500;padding:5px 13px;border-radius:999px;
+  border:1.5px solid var(--border);background:var(--white);color:var(--text2);
+  cursor:pointer;transition:all .14s;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.active{border-color:var(--accent);background:var(--accent-lt);color:var(--accent)}
+.chip.g.active{border-color:var(--green);background:var(--green-lt);color:var(--green)}
+.chip.r.active{border-color:var(--red);background:var(--red-lt);color:var(--red)}
+
+/* ── TABLE CARD ── */
+.table-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);overflow:hidden}
+.pull-table{width:100%;border-collapse:collapse}
+.pull-table thead{background:#F7F8FB;border-bottom:1px solid var(--border)}
+.pull-table thead th{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:10px 14px;text-align:left}
+.pull-table thead th.c{text-align:center}
+.pull-row{border-bottom:1px solid var(--border);transition:background .1s}
+.pull-row:last-child{border-bottom:none}
+.pull-row:hover{background:#FAFBFD}
+.pull-row.hidden-row{display:none}
+.pull-row td{padding:10px 14px;vertical-align:middle}
+.prod-name{font-size:13px;font-weight:500}
+.ntag{
+  display:inline-block;font-size:10px;font-weight:600;
+  padding:1px 7px;border-radius:999px;margin-left:5px;vertical-align:middle;
+  background:var(--amber-lt);color:var(--amber);border:1px solid #FCD34D;
+}
+.ntag.f{background:var(--blue-lt);color:var(--accent);border-color:#93C5FD}
+.par-b{
+  display:inline-block;font-size:11px;font-weight:600;
+  padding:3px 10px;border-radius:999px;
+  background:#F0F2F5;color:var(--text2);border:1px solid var(--border);
+}
+.pull-input{
+  width:58px;background:#F0F2F5;border:1.5px solid var(--border);
+  border-radius:7px;color:var(--text);font-family:var(--font);
+  font-size:14px;font-weight:600;text-align:center;padding:6px 4px;
+  outline:none;transition:border-color .14s,background .14s;-webkit-appearance:none;
+}
+.pull-input:focus{border-color:var(--accent);background:var(--accent-lt)}
+.pull-input.hv{border-color:var(--accent);background:var(--accent-lt);color:var(--accent)}
+.sbts{display:flex;gap:5px;justify-content:center}
+.sb{
+  width:32px;height:32px;border-radius:7px;border:1.5px solid var(--border);
+  background:#F0F2F5;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:14px;font-weight:700;transition:all .14s;color:var(--muted);
+}
+.sb.tick:hover{border-color:var(--green);color:var(--green)}
+.sb.cross:hover{border-color:var(--red);color:var(--red)}
+.sb.tick.on{background:var(--green-lt);border-color:var(--green);color:var(--green)}
+.sb.cross.on{background:var(--red-lt);border-color:var(--red);color:var(--red)}
+.icon-btn{
+  width:30px;height:30px;border-radius:7px;border:1.5px solid var(--border);
+  background:transparent;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:13px;color:var(--muted);transition:all .14s;margin:0 auto;
+}
+.icon-btn:hover{border-color:var(--red);color:var(--red);background:var(--red-lt)}
+
+/* ── REMOVED PANEL ── */
+.removed-section{margin-top:14px}
+.rem-toggle{
+  display:flex;align-items:center;gap:8px;width:100%;
+  background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);
+  padding:10px 16px;font-family:var(--font);font-size:13px;font-weight:600;
+  color:var(--text2);cursor:pointer;box-shadow:var(--shadow-sm);transition:border-color .14s;
+}
+.rem-toggle:hover{border-color:var(--accent);color:var(--accent)}
+.rem-badge{background:var(--red-lt);color:var(--red);border:1px solid #FCA5A5;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px}
+.chev{margin-left:auto;font-size:11px;transition:transform .2s}
+.rem-toggle.open .chev{transform:rotate(180deg)}
+.rem-list{display:none;background:var(--white);border:1.5px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r);overflow:hidden}
+.rem-list.open{display:block}
+.rem-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text2)}
+.rem-row:last-child{border-bottom:none}
+.rem-row span{flex:1}
+.restore-btn{
+  font-family:var(--font);font-size:11px;font-weight:600;
+  padding:4px 12px;border-radius:999px;
+  border:1.5px solid var(--green);background:var(--green-lt);color:var(--green);
+  cursor:pointer;transition:all .14s;white-space:nowrap;
+}
+.restore-btn:hover{background:var(--green);color:white}
+
+/* ── BOTTOM BAR ── */
+.bottom-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  background:var(--white);border-top:1px solid var(--border);
+  box-shadow:0 -4px 18px rgba(0,0,0,.06);
+  padding:10px 18px;display:flex;align-items:center;gap:7px;
+}
+.stat-chip{
+  font-size:11px;font-weight:600;padding:5px 11px;border-radius:999px;
+  border:1.5px solid var(--border);background:#F0F2F5;color:var(--text2);
+  cursor:pointer;transition:all .14s;white-space:nowrap;
+}
+.stat-chip:hover,.stat-chip.hi{border-color:var(--accent);background:var(--accent-lt);color:var(--accent)}
+.bb-sp{flex:1}
+
+/* ── BUTTONS ── */
+.btn{
+  font-family:var(--font);font-size:12px;font-weight:600;
+  padding:8px 15px;border-radius:7px;border:1.5px solid transparent;
+  cursor:pointer;transition:all .14s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+}
+.btn-pri{background:var(--accent);color:white;border-color:var(--accent);box-shadow:0 2px 8px rgba(29,78,216,.22)}
+.btn-pri:hover{filter:brightness(1.08)}
+.btn-out{background:var(--white);color:var(--text2);border-color:var(--border2)}
+.btn-out:hover{border-color:var(--accent);color:var(--accent)}
+.btn-dan{background:var(--white);color:var(--red);border-color:#FCA5A5}
+.btn-dan:hover{background:var(--red-lt);border-color:var(--red)}
+.btn-grn{background:var(--green);color:white;border-color:var(--green);box-shadow:0 2px 8px rgba(5,150,105,.22)}
+.btn-grn:hover{filter:brightness(1.08)}
+.btn-sm{padding:6px 13px;font-size:11px}
+
+/* ── OVERLAY / SHEET ── */
+.overlay{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(15,18,30,.45);backdrop-filter:blur(3px);
+  align-items:flex-end;justify-content:center;
+}
+.overlay.open{display:flex}
+.sheet{
+  background:var(--white);border-radius:20px 20px 0 0;
+  width:100%;max-width:680px;max-height:90vh;overflow-y:auto;
+  box-shadow:var(--shadow-lg);animation:sheetUp .26s cubic-bezier(.32,.72,0,1);
+}
+@keyframes sheetUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.sh-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0}
+.sh-header{
+  padding:14px 18px;display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--white);z-index:1;
+}
+.sh-header h3{font-size:15px;font-weight:700;flex:1}
+.sh-body{padding:12px 16px 28px}
+
+/* Edit list items */
+.ei{display:flex;align-items:center;gap:7px;background:#F7F8FB;border:1.5px solid var(--border);border-radius:7px;padding:9px 11px;margin-bottom:4px;cursor:grab}
+.ei:active{cursor:grabbing} .ei.drag{opacity:.4} .ei.over{border-color:var(--accent);background:var(--accent-lt)}
+.dh{color:var(--muted);font-size:16px;flex-shrink:0}
+.ei-name{flex:1;font-size:12px;font-weight:500}
+.ef{display:flex;align-items:center;gap:3px}
+.ef label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.mi{width:48px;background:var(--white);border:1.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--font);font-size:12px;font-weight:600;text-align:center;padding:4px;outline:none}
+.mi:focus{border-color:var(--accent)}
+.edel{width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .14s;flex-shrink:0}
+.edel:hover{border-color:var(--red);color:var(--red);background:var(--red-lt)}
+.add-row{display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 0;border-top:1px solid var(--border);margin-top:8px}
+.add-row input{flex:1;min-width:110px;background:var(--white);border:1.5px solid var(--border2);border-radius:7px;color:var(--text);font-family:var(--font);font-size:12px;padding:8px 10px;outline:none}
+.add-row input:focus{border-color:var(--accent)}
+
+/* ── CONFIRM MODAL ── */
+.conf-ov{display:none;position:fixed;inset:0;z-index:300;background:rgba(15,18,30,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.conf-ov.open{display:flex}
+.conf-box{background:var(--white);border-radius:var(--r-lg);padding:28px 24px;max-width:340px;width:90%;box-shadow:var(--shadow-lg);text-align:center;animation:popIn .22s cubic-bezier(.32,.72,0,1)}
+@keyframes popIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+.conf-icon{font-size:36px;margin-bottom:12px}
+.conf-box h3{font-size:16px;font-weight:700;margin-bottom:8px}
+.conf-box p{font-size:13px;color:var(--text2);line-height:1.55;margin-bottom:20px}
+.conf-acts{display:flex;gap:8px}
+.conf-acts .btn{flex:1;justify-content:center}
+
+/* ── DATE PAGE ── */
+.date-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.date-toolbar h2{font-size:15px;font-weight:700;flex:1}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);font-weight:500}
+.leg-dot{width:8px;height:8px;border-radius:50%}
+.date-grid{display:flex;flex-direction:column;gap:6px}
+.dc{
+  background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);
+  padding:11px 15px;display:flex;align-items:center;gap:12px;
+  box-shadow:var(--shadow-sm);position:relative;overflow:hidden;
+}
+.dc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.dc.fresh::before{background:var(--green)} .dc.mod::before{background:var(--amber)} .dc.tight::before{background:var(--red)}
+.dc-thumb{
+  width:46px;height:46px;border-radius:var(--r);background:#F0F2F5;
+  border:1.5px solid var(--border);overflow:hidden;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;
+}
+.dc-thumb img{width:100%;height:100%;object-fit:cover}
+.dc-info{flex:1;min-width:0}
+.dc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.dc-badge{font-size:15px;font-weight:700;flex-shrink:0;padding:5px 12px;border-radius:var(--r)}
+.dc-badge.fresh{background:var(--green-lt);color:var(--green)}
+.dc-badge.mod  {background:var(--amber-lt);color:var(--amber)}
+.dc-badge.tight{background:var(--red-lt);  color:var(--red)}
+.dei{background:#F7F8FB;border:1.5px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:6px}
+.dei-top{font-size:12px;font-weight:600;margin-bottom:7px}
+.dei-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dei-row label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase}
+
+/* ── IMG MODAL ── */
+.img-ov{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.88);align-items:center;justify-content:center}
+.img-ov.open{display:flex}
+.img-ov img{max-width:92vw;max-height:82vh;border-radius:var(--r-lg);object-fit:contain;box-shadow:var(--shadow-lg)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:74px;left:50%;transform:translateX(-50%);
+  background:var(--text);color:white;padding:10px 18px;border-radius:var(--r);
+  font-size:13px;font-weight:500;display:flex;align-items:center;gap:12px;
+  z-index:999;box-shadow:var(--shadow-lg);white-space:nowrap;
+  animation:toastIn .24s ease;
+}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
+.t-undo{color:#60A5FA;cursor:pointer;font-weight:700;border:none;background:none;font-family:var(--font);font-size:13px}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty .ei2{font-size:40px;margin-bottom:10px}
+.empty p{font-size:13px}
+
+.page-spacer{height:70px}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="tl">
+    <div class="tl-icon">❄️</div>
+    <div class="tl-text">
+      <h1>Freezer Manager</h1>
+      <p>Bakery · Pull &amp; Date</p>
+    </div>
+  </div>
+  <div class="tab-pills">
+    <button class="tab-pill active" onclick="switchPage('pull',this)">Pull List</button>
+    <button class="tab-pill"        onclick="switchPage('date',this)">Date Labels</button>
+  </div>
+  <div class="sync-pill">
+    <div class="sd" id="sd"></div>
+    <span id="sl">—</span>
+  </div>
+</div>
+
+<!-- PAGE 1 — PULL LIST -->
+<div class="page active" id="page-pull">
+  <div class="filter-bar">
+    <button class="chip active" id="cAll"     onclick="setFilter('all')">All Items</button>
+    <button class="chip"        id="cEntered" onclick="setFilter('entered')">Has Qty</button>
+    <button class="chip g"      id="cIn"      onclick="setFilter('instock')">✓ In Stock</button>
+    <button class="chip r"      id="cOut"     onclick="setFilter('nostock')">✗ Not In Stock</button>
+  </div>
+
+  <div class="table-card">
+    <table class="pull-table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Par</th>
+          <th class="c">Pull Qty</th>
+          <th class="c">Status</th>
+          <th class="c"></th>
+        </tr>
+      </thead>
+      <tbody id="pullBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Removed items -->
+  <div class="removed-section" id="remSec" style="display:none">
+    <button class="rem-toggle" id="remToggle" onclick="toggleRemPanel()">
+      <span>🗑 Removed Items</span>
+      <span class="rem-badge" id="remBadge">0</span>
+      <span class="chev">▼</span>
+    </button>
+    <div class="rem-list" id="remList"></div>
+  </div>
+
+  <div class="page-spacer"></div>
+</div>
+
+<!-- PAGE 2 — DATE LABELS -->
+<div class="page" id="page-date">
+  <div class="date-toolbar">
+    <h2>Date Labels</h2>
+    <button class="btn btn-out btn-sm" onclick="openDateEdit()">✎ Edit</button>
+    <button class="btn btn-out btn-sm" onclick="downloadDateList()">⬇ CSV</button>
+    <button class="btn btn-grn btn-sm" onclick="generateDates()">⚡ Generate</button>
+  </div>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>15+ days</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--amber)"></div>7–14 days</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>&lt;7 days</div>
+  </div>
+  <div class="date-grid" id="dateGrid">
+    <div class="empty"><div class="ei2">📋</div><p>Enter quantities on the Pull List, then tap ⚡ Generate.</p></div>
+  </div>
+  <div class="page-spacer"></div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar" id="bb">
+  <button class="stat-chip" id="scE" onclick="setFilter('entered')">0 entered</button>
+  <button class="stat-chip" id="scI" onclick="setFilter('instock')">0 ✓</button>
+  <button class="stat-chip" id="scO" onclick="setFilter('nostock')">0 ✗</button>
+  <div class="bb-sp"></div>
+  <button class="btn btn-out btn-sm" onclick="downloadPullList()">⬇ CSV</button>
+  <button class="btn btn-dan btn-sm" onclick="confirmClearAll()">🗑 Clear All</button>
+  <button class="btn btn-pri btn-sm" onclick="openEditPanel()">✎ Edit</button>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast" style="display:none">
+  <span id="toastMsg"></span>
+  <button class="t-undo" onclick="undoRemove()">UNDO</button>
+</div>
+
+<!-- EDIT PULL LIST SHEET -->
+<div class="overlay" id="editOv" onclick="ovClose(event,'editOv')">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-header">
+      <h3>✎ Edit Pull List</h3>
+      <button class="btn btn-pri btn-sm" onclick="closeEditPanel()">Done</button>
+    </div>
+    <div class="sh-body">
+      <div id="editList"></div>
+      <div class="add-row">
+        <input type="text" id="nName"  placeholder="Product name">
+        <input type="text" id="nPar"   placeholder="Par"   style="max-width:66px" inputmode="numeric">
+        <input type="text" id="nDays"  placeholder="Days"  style="max-width:66px" inputmode="numeric">
+        <input type="text" id="nNotes" placeholder="Notes (optional)">
+        <button class="btn btn-pri btn-sm" onclick="addNewItem()">+ Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT DATE SHEET -->
+<div class="overlay" id="dateOv" onclick="ovClose(event,'dateOv')">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-header">
+      <h3>✎ Edit Date Settings</h3>
+      <button class="btn btn-pri btn-sm" onclick="closeDateEdit()">Done</button>
+    </div>
+    <div class="sh-body" id="dateEditBody"></div>
+  </div>
+</div>
+
+<!-- CONFIRM — CLEAR ALL -->
+<div class="conf-ov" id="clearConf">
+  <div class="conf-box">
+    <div class="conf-icon">🧹</div>
+    <h3>Clear All Entries?</h3>
+    <p>This resets all quantities, statuses and removed items — ready for tonight's pull. Your product list stays the same.</p>
+    <div class="conf-acts">
+      <button class="btn btn-out" onclick="document.getElementById('clearConf').classList.remove('open')">Cancel</button>
+      <button class="btn btn-dan" onclick="clearAll()">Yes, Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM — DOUBLE CHECK DATES -->
+<div class="conf-ov" id="dateCheck">
+  <div class="conf-box">
+    <div class="conf-icon">⚠️</div>
+    <h3>Before You Label</h3>
+    <p>Make sure to <strong>double check at least one date</strong> before dating products!</p>
+    <button class="btn btn-pri" style="width:100%" onclick="document.getElementById('dateCheck').classList.remove('open')">Got it</button>
+  </div>
+</div>
+
+<!-- IMAGE MODAL -->
+<div class="img-ov" id="imgOv" onclick="this.classList.remove('open')">
+  <img id="imgSrc" src="" alt="">
+</div>
+
+<script>
+// ── DEFAULT DATA ──────────────────────────────────────────
+const DEF = [
+  {name:"Whittings Fruit And Nut Loaf 460gm",par:2,days:21,notes:""},
+  {name:"Whittings Date And Apricot 460gm",par:2,days:21,notes:""},
+  {name:"Whittings Light Fruit Cake 480gm",par:2,days:60,notes:""},
+  {name:"Papa Joe's Banana Bread Single 100gm",par:1,days:14,notes:""},
+  {name:"Papa Joe's Banana Bread 500gm",par:2,days:14,notes:""},
+  {name:"Happy Cake Loaf Carrot",par:1,days:10,notes:""},
+  {name:"Noshu Iced Carrot Cake 180gm",par:2,days:15,notes:""},
+  {name:"Noshu Fudgy Peanut Brownies 190gm",par:2,days:20,notes:""},
+  {name:"Baker's Oven Lemon Iced Madeira Cake 315gm",par:2,days:21,notes:""},
+  {name:"Baker's Oven Madeira Cake 500gm",par:2,days:21,notes:""},
+  {name:"Greens Lamington Triple Chocolate 4pk",par:1,days:16,notes:""},
+  {name:"Greens Lamington Strawberry And Cream 4pk",par:1,days:16,notes:""},
+  {name:"Baker's Oven Lamington Fingers 350gm",par:4,days:21,notes:""},
+  {name:"Baker's Oven Lamington Jam 350gm",par:4,days:21,notes:""},
+  {name:"Baker's Oven Lamington Cream 350gm",par:4,days:28,notes:""},
+  {name:"Baker's Oven Rollette Choc 250gm",par:2,days:21,notes:""},
+  {name:"Baker's Oven Sponge Roll Choc 400gm",par:2,days:21,notes:""},
+  {name:"Cadbury Rolls Mini Rasp 5pk",par:2,days:63,notes:""},
+  {name:"Cadbury Rolls Mini Choc 5pk",par:2,days:49,notes:""},
+  {name:"Comm Co Double Choc Muffin Gluten Free 160gm",par:2,days:10,notes:""},
+  {name:"Baker's Oven Rollette Jam 250gm",par:2,days:21,notes:""},
+  {name:"Baker's Oven Roll Jam 400gm",par:2,days:21,notes:""},
+  {name:"Mr Kipling Angel Slice 6pk",par:2,days:24,notes:""},
+  {name:"Mr Kipling Lemon Slice 6pk",par:2,days:24,notes:""},
+  {name:"Comm Co Brownies Gluten Free 180gm",par:2,days:14,notes:""},
+  {name:"Comm Co Caramel Slice Gluten Free 180gm",par:2,days:14,notes:""},
+  {name:"Happy Muffin Co Choc Chip 4pk",par:1,days:7,notes:""},
+  {name:"Happy Muffin Co Blueberry 4pk",par:1,days:7,notes:""},
+  {name:"Happy Muffin Co Double Choc Chip Mini 8pk",par:2,days:7,notes:""},
+  {name:"Happy Muffin Co Choc Chip Mini 8pk",par:2,days:7,notes:""},
+  {name:"Happy Muffin Co Blueberry 8pk",par:1,days:7,notes:""},
+  {name:"Country Chef Pavlova 500gm",par:1,days:35,notes:""},
+  {name:"Comm Co Mud Cake Choc",par:1,days:14,notes:""},
+  {name:"Country Chef Cupcake Red Velvet 4pk 240gm",par:1,days:9,notes:""},
+  {name:"Country Chef Cupcake Choc 4pk 288gm",par:1,days:9,notes:""},
+  {name:"Comm Co Fruit Slice Loaf Gluten Free 585gm",par:1,days:10,notes:""},
+  {name:"Marcel's Pancake Happy 6pk 240gm",par:2,days:5,notes:""},
+  {name:"Marcel's Pancake Happy Petit 24pk 200gm",par:1,days:5,notes:""},
+  {name:"Marcel's Buttermilk Pikelets 200gm",par:2,days:5,notes:""},
+  {name:"This Sourdough Co Crumpets 260gm",par:1,days:3,notes:""},
+  {name:"New York Bagel 4pk",par:2,days:8,notes:""},
+  {name:"Glick's Bagel Everything 4pk 360gm",par:2,days:8,notes:""},
+  {name:"Glick's Bagel Plain 4pk 360gm",par:2,days:8,notes:""},
+  {name:"Glick's Bagel Sesame 4pk 360gm",par:2,days:8,notes:""},
+  {name:"Comm Co English Muffin G/F 390gm",par:1,days:10,notes:""},
+  {name:"This Sourdough Co English Muffins 260gm",par:1,days:3,notes:""},
+  {name:"Toscano Croissants 240gm",par:6,days:21,notes:""},
+  {name:"Baker's Oven Croissants 3pk",par:2,days:5,notes:""},
+  {name:"Mill Lane English Style Waffles 6pk 130gm",par:2,days:41,notes:""},
+  {name:"Wattle Valley Waffle 280gm",par:6,days:28,notes:""},
+  {name:"Toscano Waffles 360gm",par:6,days:35,notes:""},
+  {name:"Toscano Brioche Buns 270gm",par:0,days:21,notes:"Whole Box"},
+  {name:"Toscano Hot Dog Buns 270gm",par:6,days:21,notes:""},
+  {name:"Toscano Brioche Classic 280gm",par:4,days:21,notes:""},
+  {name:"Bakers Oven Dinner Rolls 6pk",par:1,days:3,notes:"Blue"},
+  {name:"Bakery Dujour Brioche Buns 4pk",par:2,days:5,notes:""},
+  {name:"Comm Co Sourdough Baguette",par:2,days:3,notes:"Bags above weigh labeller"},
+  {name:"Comm Co Sourdough Rolls 4pk",par:1,days:3,notes:"Thaw in the bag"},
+  {name:"Mr Pitta Milk Buns",par:3,days:7,notes:""},
+  {name:"Mill Lane Sourdough White Vienna 680gm",par:2,days:4,notes:""},
+  {name:"Mill Lane Sourdough Multigrain Vienna 680gm",par:2,days:4,notes:""},
+  {name:"Mill Lane Turkish 3pk",par:6,days:5,notes:""},
+  {name:"Mill Lane Ciabatta 3pk",par:2,days:5,notes:""},
+  {name:"Kontos Flatbread Multigrain 5pk 397gm",par:2,days:10,notes:""},
+  {name:"Kontos Pita White 5pk 397gm",par:2,days:10,notes:""},
+  {name:"Mission Souvlaki 320gm",par:4,days:14,notes:""},
+  {name:"Kontos Grilled Panini 255gm",par:2,days:28,notes:""},
+  {name:"Mr Pitta Pita Bread",par:3,days:7,notes:""},
+  {name:"Comm Co Loaf Seeded 585gm",par:4,days:10,notes:""},
+  {name:"Well And Good White Sliced 300gm",par:2,days:18,notes:""},
+  {name:"Well And Good Brioche Buns 225gm",par:2,days:18,notes:""},
+  {name:"Comm Co Chicken Schnitzel 400gm",par:3,days:15,notes:"THAW IN FRIDGE"},
+  {name:"Comm Co Butter Chicken 350gm",par:2,days:16,notes:"THAW IN FRIDGE"},
+  {name:"Comm Co Chicken Tikka Masala 350gm",par:2,days:16,notes:"THAW IN FRIDGE"},
+  {name:"Comm Co Satay Chicken 350gm",par:2,days:16,notes:"THAW IN FRIDGE"},
+  {name:"Comm Co Thai Green Curry",par:2,days:16,notes:"THAW IN FRIDGE"},
+  {name:"Gerry's Pittes 450gm",par:0,days:21,notes:"Whole Box"},
+  {name:"Solo Tiramisu 200gm",par:4,days:40,notes:"THAW IN FRIDGE"},
+  {name:"Comm Co Fruit HCB",par:1,days:3,notes:""},
+  {name:"Comm Co Fruitless HCB",par:1,days:3,notes:""},
+  {name:"Comm Co Choc Chip HCB",par:1,days:3,notes:""},
+  {name:"Yarrows Fruit HCB",par:1,days:5,notes:""},
+  {name:"Yarrows Fruitless HCB",par:1,days:5,notes:""},
+];
+
+// ── STATE ──────────────────────────────────────────────────
+let items=[],rowState={},images={},genDates={};
+let lastRemId=null,undoTimer=null,curFilter='all',dragSrc=null,remOpen=false;
+
+// ── FIREBASE ───────────────────────────────────────────────
+function wFb(cb){if(window._fbReady)cb();else window.addEventListener('firebaseReady',cb,{once:true})}
+
+function fbSave(){
+  wFb(()=>{
+    const r=window._fbRef(window._fbDb,'freezer/');
+    window._fbSet(r,{items,rowState,images,genDates})
+      .then(()=>setSync('live','Live'))
+      .catch(()=>setSync('err','Error'));
+  });
+}
+
+function fbLoad(){
+  wFb(()=>{
+    const r=window._fbRef(window._fbDb,'freezer/');
+    window._fbOnValue(r,snap=>{
+      const d=snap.val();
+      if(d){
+        if(d.items)    items=d.items;
+        if(d.rowState) rowState=d.rowState;
+        if(d.images)   images=d.images;
+        if(d.genDates) genDates=d.genDates;
+      } else {
+        items=DEF.map((it,i)=>({...it,id:i}));
+      }
+      setSync('live','Live');
+      renderPull();
+      if(Object.keys(genDates).length) renderDateList();
+    },()=>setSync('err','Offline'));
+  });
+}
+
+function save(){
+  localStorage.setItem('fd',JSON.stringify({items,rowState,images,genDates}));
+  try{fbSave()}catch(e){}
+}
+
+function setSync(cls,lbl){
+  document.getElementById('sd').className='sd '+cls;
+  document.getElementById('sl').textContent=lbl;
+}
+
+// ── INIT ───────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  setSync('','Connecting…');
+  const saved=localStorage.getItem('fd');
+  if(saved){
+    const d=JSON.parse(saved);
+    if(d.items)    items=d.items;
+    if(d.rowState) rowState=d.rowState;
+    if(d.images)   images=d.images;
+    if(d.genDates) genDates=d.genDates;
+    renderPull();
+    if(Object.keys(genDates).length) renderDateList();
+  }
+  fbLoad();
+});
+
+// ── PULL LIST ──────────────────────────────────────────────
+function renderPull(){
+  const tb=document.getElementById('pullBody');
+  tb.innerHTML='';
+  items.forEach((item,idx)=>{
+    const id=item.id??idx;
+    const rs=rowState[id]||{};
+    if(rs.removed)return;
+    const qty=rs.qty||'',st=rs.status||'';
+    const tr=document.createElement('tr');
+    tr.className='pull-row';tr.dataset.id=id;
+    applyFilter(tr,qty,st);
+    const isFridge=(item.notes||'').toUpperCase().includes('FRIDGE');
+    const noteHtml=item.notes?`<span class="ntag ${isFridge?'f':''}">${item.notes}</span>`:'';
+    tr.innerHTML=`
+      <td><span class="prod-name">${item.name}</span>${noteHtml}</td>
+      <td><span class="par-b">${item.par||'—'}</span></td>
+      <td style="text-align:center">
+        <input class="pull-input ${qty?'hv':''}" type="number" inputmode="numeric" pattern="[0-9]*"
+          value="${qty}" min="0" data-id="${id}" data-idx="${idx}"
+          onchange="setQty(this)" onkeydown="handleEnter(event,${idx})">
+      </td>
+      <td>
+        <div class="sbts">
+          <button class="sb tick ${st==='tick'?'on':''}"  onclick="setSt(${id},'tick',this)">✓</button>
+          <button class="sb cross ${st==='cross'?'on':''}" onclick="setSt(${id},'cross',this)">✗</button>
+        </div>
+      </td>
+      <td><button class="icon-btn" onclick="removeRow(${id})" title="Hide item">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+  updateStats();
+  renderRemoved();
+}
+
+function applyFilter(tr,qty,st){
+  const hide=f=>tr.classList[f]('hidden-row');
+  if(curFilter==='all')        hide('remove');
+  else if(curFilter==='entered') qty?hide('remove'):hide('add');
+  else if(curFilter==='instock') st==='tick'?hide('remove'):hide('add');
+  else if(curFilter==='nostock') st==='cross'?hide('remove'):hide('add');
+}
+
+function setFilter(f){
+  curFilter=f;
+  ['cAll','cEntered','cIn','cOut'].forEach(id=>document.getElementById(id)?.classList.remove('active'));
+  ({all:'cAll',entered:'cEntered',instock:'cIn',nostock:'cOut'})[f] && document.getElementById(({all:'cAll',entered:'cEntered',instock:'cIn',nostock:'cOut'})[f])?.classList.add('active');
+  document.querySelectorAll('.pull-row').forEach(tr=>{
+    const id=parseInt(tr.dataset.id);const rs=rowState[id]||{};
+    applyFilter(tr,rs.qty||'',rs.status||'');
+  });
+  updateStats();
+}
+
+function setQty(inp){
+  const id=parseInt(inp.dataset.id),v=inp.value.trim();
+  if(!rowState[id])rowState[id]={};
+  rowState[id].qty=v;
+  inp.classList.toggle('hv',!!v);
+  updateStats();save();
+}
+
+function setSt(id,which,btn){
+  if(!rowState[id])rowState[id]={};
+  const ns=rowState[id].status===which?'':which;
+  rowState[id].status=ns;
+  const row=document.querySelector(`tr[data-id="${id}"]`);
+  if(row){row.querySelector('.tick').classList.toggle('on',ns==='tick');row.querySelector('.cross').classList.toggle('on',ns==='cross');}
+  updateStats();save();
+}
+
+function handleEnter(e,idx){
+  if(e.key!=='Enter')return;e.preventDefault();
+  const vis=Array.from(document.querySelectorAll('.pull-input')).filter(i=>!i.closest('tr').classList.contains('hidden-row'));
+  const ci=vis.indexOf(e.target);if(ci<vis.length-1)vis[ci+1].focus();
+}
+
+function updateStats(){
+  let e=0,i=0,o=0;
+  items.forEach((item,idx)=>{
+    const id=item.id??idx,rs=rowState[id]||{};
+    if(rs.removed)return;
+    if(rs.qty)e++;if(rs.status==='tick')i++;if(rs.status==='cross')o++;
+  });
+  document.getElementById('scE').textContent=`${e} entered`;
+  document.getElementById('scI').textContent=`${i} ✓`;
+  document.getElementById('scO').textContent=`${o} ✗`;
+}
+
+// ── REMOVE / RESTORE ───────────────────────────────────────
+function removeRow(id){
+  if(!rowState[id])rowState[id]={};
+  rowState[id].removed=true;lastRemId=id;
+  const tr=document.querySelector(`tr[data-id="${id}"]`);
+  if(tr)tr.classList.add('hidden-row');
+  updateStats();renderRemoved();save();
+  const nm=(items.find(it=>(it.id??it._i)===id)||{}).name||'Item';
+  showToast(`"${nm.substring(0,28)}" removed`);
+}
+
+function undoRemove(){
+  if(lastRemId===null)return;
+  restoreItem(lastRemId);
+  clearTimeout(undoTimer);
+  document.getElementById('toast').style.display='none';
+  lastRemId=null;
+}
+
+function restoreItem(id){
+  if(rowState[id])rowState[id].removed=false;
+  save();renderPull();setFilter(curFilter);
+}
+
+function renderRemoved(){
+  const sec=document.getElementById('remSec'),list=document.getElementById('remList'),badge=document.getElementById('remBadge');
+  const rem=items.filter((it,i)=>(rowState[it.id??i]||{}).removed);
+  if(!rem.length){sec.style.display='none';return;}
+  sec.style.display='block';badge.textContent=rem.length;
+  list.innerHTML='';
+  rem.forEach((item,i)=>{
+    const id=item.id??i;
+    const div=document.createElement('div');div.className='rem-row';
+    div.innerHTML=`<span>${item.name}</span><button class="restore-btn" onclick="restoreItem(${id})">↩ Restore</button>`;
+    list.appendChild(div);
+  });
+}
+
+function toggleRemPanel(){
+  remOpen=!remOpen;
+  document.getElementById('remList').classList.toggle('open',remOpen);
+  document.getElementById('remToggle').classList.toggle('open',remOpen);
+}
+
+// ── CLEAR ALL ──────────────────────────────────────────────
+function confirmClearAll(){document.getElementById('clearConf').classList.add('open')}
+function clearAll(){
+  rowState={};genDates={};
+  document.getElementById('clearConf').classList.remove('open');
+  save();setFilter('all');renderPull();
+  document.getElementById('dateGrid').innerHTML='<div class="empty"><div class="ei2">📋</div><p>Enter quantities on the Pull List, then tap ⚡ Generate.</p></div>';
+  showToast('All cleared — ready for tonight!',false);
+}
+
+// ── TOAST ──────────────────────────────────────────────────
+function showToast(msg,showUndo=true){
+  const t=document.getElementById('toast');
+  document.getElementById('toastMsg').textContent=msg;
+  t.querySelector('.t-undo').style.display=showUndo?'':'none';
+  t.style.display='flex';clearTimeout(undoTimer);
+  undoTimer=setTimeout(()=>{t.style.display='none';lastRemId=null;},4500);
+}
+
+// ── PAGE SWITCH ────────────────────────────────────────────
+function switchPage(page,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-pill').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('bb').style.display=page==='pull'?'flex':'none';
+}
+
+// ── DATE GENERATE ──────────────────────────────────────────
+function generateDates(){
+  document.getElementById('dateCheck').classList.add('open');
+  const today=new Date();today.setHours(0,0,0,0);genDates={};
+  items.forEach((item,idx)=>{
+    const id=item.id??idx,rs=rowState[id]||{};
+    if(rs.removed||rs.status==='cross'||!rs.qty||parseInt(rs.qty)===0)return;
+    const exp=new Date(today);exp.setDate(exp.getDate()+item.days);
+    genDates[id]={name:item.name,days:item.days,qty:rs.qty,notes:item.notes||'',expiry:exp.toISOString().split('T')[0]};
+  });
+  save();renderDateList();
+}
+
+function renderDateList(){
+  const grid=document.getElementById('dateGrid');
+  const ids=Object.keys(genDates);
+  if(!ids.length){grid.innerHTML='<div class="empty"><div class="ei2">📦</div><p>No pulled items found.</p></div>';return;}
+  const today=new Date();today.setHours(0,0,0,0);
+  grid.innerHTML='';
+  ids.sort((a,b)=>genDates[a].expiry.localeCompare(genDates[b].expiry));
+  ids.forEach(id=>{
+    const g=genDates[id];
+    const exp=new Date(g.expiry+'T00:00:00');
+    const diff=Math.round((exp-today)/86400000);
+    const cls=diff>=15?'fresh':diff>=7?'mod':'tight';
+    const fmt=exp.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    const img=images[id]||'';
+    const div=document.createElement('div');div.className=`dc ${cls}`;
+    div.innerHTML=`
+      <div class="dc-thumb" onclick="showImg('${img}')">${img?`<img src="${img}" alt="">`:'📦'}</div>
+      <div class="dc-info">
+        <div class="dc-name">${g.name}</div>
+        <div class="dc-meta">Qty: ${g.qty} · ${g.days} days${g.notes?' · '+g.notes:''}</div>
+      </div>
+      <div class="dc-badge ${cls}">${fmt}</div>`;
+    grid.appendChild(div);
+  });
+}
+
+function showImg(url){if(!url)return;document.getElementById('imgSrc').src=url;document.getElementById('imgOv').classList.add('open')}
+
+// ── EDIT PULL LIST ─────────────────────────────────────────
+function openEditPanel(){
+  const list=document.getElementById('editList');list.innerHTML='';
+  items.forEach((item,idx)=>{
+    const div=document.createElement('div');div.className='ei';div.draggable=true;div.dataset.idx=idx;
+    div.innerHTML=`
+      <span class="dh">⠿</span>
+      <span class="ei-name">${item.name}</span>
+      <div class="ef"><label>Par</label><input class="mi" type="number" inputmode="numeric" value="${item.par}" onchange="items[${idx}].par=parseInt(this.value)||0;save()"></div>
+      <div class="ef"><label>Days</label><input class="mi" type="number" inputmode="numeric" value="${item.days}" onchange="items[${idx}].days=parseInt(this.value)||1;save()"></div>
+      <button class="edel" onclick="deleteItem(${idx})">🗑</button>`;
+    addDrag(div);list.appendChild(div);
+  });
+  document.getElementById('editOv').classList.add('open');
+}
+function closeEditPanel(){document.getElementById('editOv').classList.remove('open');renderPull()}
+
+function deleteItem(idx){
+  if(!confirm(`Remove "${items[idx].name}"?`))return;
+  items.splice(idx,1);save();openEditPanel();
+}
+
+function addNewItem(){
+  const name=document.getElementById('nName').value.trim();
+  const par=parseInt(document.getElementById('nPar').value)||0;
+  const days=parseInt(document.getElementById('nDays').value)||7;
+  const notes=document.getElementById('nNotes').value.trim();
+  if(!name){alert('Enter a product name.');return;}
+  items.push({id:Date.now(),name,par,days,notes});
+  ['nName','nPar','nDays','nNotes'].forEach(id=>document.getElementById(id).value='');
+  save();openEditPanel();
+}
+
+function addDrag(div){
+  div.addEventListener('dragstart',e=>{dragSrc=div;div.classList.add('drag');e.dataTransfer.effectAllowed='move'});
+  div.addEventListener('dragend',()=>{div.classList.remove('drag');document.querySelectorAll('.ei').forEach(d=>d.classList.remove('over'))});
+  div.addEventListener('dragover',e=>{e.preventDefault();document.querySelectorAll('.ei').forEach(d=>d.classList.remove('over'));div.classList.add('over')});
+  div.addEventListener('drop',e=>{
+    e.preventDefault();if(!dragSrc||dragSrc===div)return;
+    const f=parseInt(dragSrc.dataset.idx),t=parseInt(div.dataset.idx);
+    items.splice(t,0,items.splice(f,1)[0]);save();openEditPanel();
+  });
+}
+
+// ── EDIT DATE LIST ─────────────────────────────────────────
+function openDateEdit(){
+  const body=document.getElementById('dateEditBody');body.innerHTML='';
+  items.forEach((item,idx)=>{
+    const id=item.id??idx,img=images[id]||'';
+    const div=document.createElement('div');div.className='dei';
+    div.innerHTML=`
+      <div class="dei-top">${item.name}</div>
+      <div class="dei-row">
+        <label>Days</label>
+        <input class="mi" type="number" inputmode="numeric" value="${item.days}" onchange="items[${idx}].days=parseInt(this.value)||1;save()">
+        <label style="margin-left:10px">Photo</label>
+        <input type="file" accept="image/*" style="font-size:11px;color:var(--muted)" onchange="uploadImg(${id},this)">
+        ${img?`<img src="${img}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border)">`:''}</div>`;
+    body.appendChild(div);
+  });
+  document.getElementById('dateOv').classList.add('open');
+}
+function closeDateEdit(){document.getElementById('dateOv').classList.remove('open')}
+
+function uploadImg(id,input){
+  const file=input.files[0];if(!file)return;
+  try{
+    const sr=window._fbSRef(window._fbStorage,`images/${id}`);
+    window._fbUpload(sr,file).then(s=>window._fbGetURL(s.ref)).then(url=>{images[id]=url;save();openDateEdit()});
+    return;
+  }catch(e){}
+  const r=new FileReader();r.onload=e=>{images[id]=e.target.result;save();openDateEdit()};r.readAsDataURL(file);
+}
+
+// ── OVERLAY CLOSE ──────────────────────────────────────────
+function ovClose(e,id){
+  if(e.target.classList.contains('overlay')){
+    document.getElementById(id).classList.remove('open');
+    if(id==='editOv')renderPull();
+  }
+}
+
+// ── DOWNLOADS ──────────────────────────────────────────────
+function downloadPullList(){
+  const d=new Date().toLocaleDateString('en-AU');
+  let csv=`Bakery Pull List — ${d}\n\nProduct,Par,Pull Qty,Status,Notes\n`;
+  items.forEach((item,idx)=>{
+    const id=item.id??idx,rs=rowState[id]||{};if(rs.removed)return;
+    const st=rs.status==='tick'?'In Stock':rs.status==='cross'?'Not In Stock':'';
+    csv+=`"${item.name}",${item.par},${rs.qty||''},${st},"${item.notes||''}"\n`;
+  });
+  dlFile(csv,`pull-list-${d}.csv`,'text/csv');
+}
+
+function downloadDateList(){
+  const ids=Object.keys(genDates);if(!ids.length){alert('Generate dates first!');return;}
+  const d=new Date().toLocaleDateString('en-AU');
+  let csv=`Bakery Date Labels — ${d}\n\nProduct,Qty,Days,Expiry,Notes\n`;
+  ids.sort((a,b)=>genDates[a].expiry.localeCompare(genDates[b].expiry));
+  ids.forEach(id=>{
+    const g=genDates[id],exp=new Date(g.expiry+'T00:00:00').toLocaleDateString('en-AU');
+    csv+=`"${g.name}",${g.qty},${g.days},"${exp}","${g.notes}"\n`;
+  });
+  dlFile(csv,`date-list-${d}.csv`,'text/csv');
+}
+
+function dlFile(content,name,type){
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([content],{type})),download:name});
+  a.click();
+}
+</script>
+</body>
+</html>
